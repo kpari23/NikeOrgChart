@@ -33,7 +33,6 @@
 }}
 
 html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--tp)}
-
 .page{max-width:1600px;margin:0 auto;padding:24px 20px 60px}
 
 .toolbar{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px}
@@ -97,6 +96,35 @@ html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 
 .vline{width:1px;height:16px;background:var(--line)}
 .note{font-size:10.5px;color:var(--tt);font-style:italic;margin-top:14px}
+
+.tooltip{
+  position:fixed;
+  z-index:9999;
+  width:260px;
+  background:var(--surface);
+  border:0.5px solid var(--b2);
+  border-radius:12px;
+  padding:13px 15px;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .15s;
+  box-shadow:0 4px 24px rgba(0,0,0,0.13);
+}
+.tooltip.visible{opacity:1}
+.tt-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tt-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;flex-shrink:0}
+.tt-name{font-size:13px;font-weight:600;color:var(--tp);line-height:1.3}
+.tt-role{font-size:11px;color:var(--ts);margin-top:2px;line-height:1.4}
+.tt-divider{height:0.5px;background:var(--b1);margin:8px 0}
+.tt-row{display:flex;align-items:flex-start;gap:7px;margin-bottom:5px}
+.tt-row:last-child{margin-bottom:0}
+.tt-label{font-size:10px;color:var(--tt);min-width:52px;flex-shrink:0;padding-top:1px}
+.tt-value{font-size:11px;color:var(--tp);line-height:1.4;flex:1}
+.tt-leads-hdr{font-size:9px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 5px}
+.tt-lead-row{display:flex;align-items:flex-start;gap:5px;padding:2.5px 0;border-bottom:0.5px solid rgba(250,84,0,.1)}
+.tt-lead-row:last-child{border-bottom:none}
+.tt-lead-name{font-size:10.5px;font-weight:500;color:var(--tp)}
+.tt-lead-title{font-size:9.5px;color:var(--ts);margin-top:1px;line-height:1.3}
 </style>
 </head>
 <body>
@@ -105,7 +133,7 @@ html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   <div class="toolbar">
     <div>
       <div class="toolbar-title">Nike, Inc. — Org Chart</div>
-      <div class="toolbar-sub">64 leads overlaid · April 2026 · Click any highlighted node to expand contacts</div>
+      <div class="toolbar-sub">64 leads overlaid · April 2026 · Hover any node for details · Click nodes with leads to expand</div>
     </div>
     <div class="filters" id="filters">
       <button class="fb on" data-f="all">All leads</button>
@@ -138,6 +166,8 @@ html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 
   <div class="note">Hypothetical org chart · publicly available information · April 2026. Andy Caine replaces Tony Bignell as CIO effective Apr 12. Sub-function reporting lines are illustrative.</div>
 </div>
+
+<div id="tooltip" class="tooltip"></div>
 
 <script>
 const LEADS=[
@@ -206,66 +236,122 @@ const LEADS=[
   {name:'Joni Marsch',title:'Director & Chief of Staff, Global Sport Planning Enablement',email:'joni.marsch@nike.com',s:'dir',tag:'Strategy',node:'cpo'},
 ];
 
-const ORG=[
-  {id:'ceo',nm:'Elliott Hill',rl:'President & CEO',color:'c-ceo',badge:'CEO · Oct 2024',children:[
-    {id:'board',nm:'Mark Parker & P. Knight',rl:'Executive Chairman · Chairman Emeritus',color:'c-ceo',badge:'Board',children:[]},
-    {id:'coo',nm:'Venky Alagirisamy',rl:'EVP, Chief Operating Officer',color:'c-ops',badge:'COO',children:[
-      {id:'sc',nm:'Supply Chain & Planning',rl:'Global ops, manufacturing, logistics',color:'c-ops',badge:'Supply Chain',children:[]},
-      {id:'tech',nm:'Technology',rl:'Enterprise tech, digital products, infra',color:'c-ops',badge:'Technology',children:[
-        {id:'portfolio',nm:'Enterprise Portfolio & Transformation',rl:'Digital transformation, portfolio PMO',color:'c-ops',badge:'Portfolio',children:[]}
-      ]},
-      {id:'sustain',nm:'Cimarron Nix',rl:'Chief Sustainability Officer',color:'c-ops',badge:'Sustainability',children:[]},
+const NODE_META={
+  ceo:{detail:'Returned as CEO Oct 2024 after a 30-year Nike career. Driving the "Win Now" turnaround strategy focused on sports-led innovation, operational efficiency, and reconnecting with athletes.',reports:'Full C-suite + 4 geo leaders',hq:'Beaverton, OR'},
+  board:{detail:'Mark Parker served as CEO 2006–2020, now Executive Chairman. Philip Knight co-founded Nike in 1964. Both serve advisory and governance roles.',hq:'Beaverton, OR'},
+  coo:{detail:'Joined Dec 2025. Mandate is to integrate technology end-to-end across create-plan-make-deliver-sell. Former CTO role was eliminated and folded into COO remit.',reports:'Supply Chain, Technology, Sustainability',hq:'Beaverton, OR'},
+  sc:{detail:'Manages global manufacturing partnerships (primarily Asia), demand/supply planning, distribution centers, and last-mile logistics across 190+ countries.',reports:'Global Sourcing, Demand Planning, Distribution',hq:'Beaverton, OR'},
+  tech:{detail:'Enterprise technology org absorbed from former CTO role (Dec 2025). Covers ERP/infrastructure, Nike.com, Nike App, SNKRS, and connected fitness platforms.',reports:'Enterprise Technology, Digital Product & Engineering',hq:'Beaverton, OR'},
+  portfolio:{detail:'Cross-functional enterprise portfolio PMO. Owns digital transformation governance, portfolio prioritization, and program management across all technology initiatives. Key Planview opportunity.',reports:'12 identified leads',hq:'Beaverton, OR'},
+  sustain:{detail:'Cimarron Nix elevated to CSO in March 2026. Oversees Move to Zero carbon/waste program, recycled materials strategy, and Nike Foundation community initiatives.',reports:'Move to Zero, Sustainable Materials',hq:'Beaverton, OR'},
+  cfo:{detail:'CFO since 2020. Now also owns NIKE Direct and global commercial strategy. Key economic buyer for any investment in portfolio visibility or financial planning tools.',reports:'CSO, Nike Direct, Global Sales, Finance',hq:'Beaverton, OR'},
+  cso:{detail:'Jennifer Hartley appointed Aug 2025. 14-year Nike veteran, previously VP Strategic Enterprise Capabilities. Reports to CFO, works directly with CEO on Win Now agenda.',reports:'Corporate Strategy, Enterprise Capabilities, Consumer Strategy',hq:'Beaverton, OR'},
+  direct:{detail:'NIKE Direct includes Nike.com, Nike App, SNKRS, and owned retail stores. Repositioned as premium channel after record Black Friday 2025. CFO Matt Friend owns this P&L.',reports:'Nike Digital, Nike Stores, Membership & CRM',hq:'Beaverton, OR'},
+  sales:{detail:'Global wholesale and marketplace management. Covers key accounts (Foot Locker, Dick\'s, JD Sports) and partner door strategy. Relationship repair with retail partners is a key FY26 priority.',reports:'Key Accounts, Marketplace Management',hq:'Beaverton, OR'},
+  growth:{detail:'Dr. Thomas Clarke leads cross-functional strategic growth programs, coordinating Hill\'s Win Now agenda and emerging business models including NikeSKIMS and new collaborations.',hq:'Beaverton, OR'},
+  cidp:{detail:'Phil McCartney oversees all innovation, design, and product creation across Nike, Jordan, and Converse. Appointed as CEO\'s right hand for the product-first turnaround.',reports:'CIO Andy Caine, Global Design, Product Creation',hq:'Beaverton, OR'},
+  cio:{detail:'Andy Caine appointed Apr 12, 2026 — replacing Tony Bignell, the 4th CIO change in 3 years. 20-year Nike veteran. Led Mercurial, Air VaporMax, Air Max 1000. Athlete-obsession focus.',reports:'Performance Innovation, NSRL, cross-brand innovation',hq:'Beaverton, OR'},
+  perf:{detail:'Core innovation engine. Owns Air, React, and Flyknit technology platforms. Driving Nike Mind (sensory-receptor footwear) and Project Amplify (mass-market performance running). Key Planview PD target.',reports:'14 identified leads',hq:'Beaverton, OR'},
+  nsrl:{detail:'Nike Sports Research Lab — advanced biomechanics, materials science, and athlete data research. Feeds the performance innovation pipeline for all three brands.',hq:'Beaverton, OR'},
+  design:{detail:'Global design teams covering footwear, apparel, equipment, and CMF (Color, Materials & Finish). Works across all brands and sports categories.',reports:'6 identified leads',hq:'Beaverton, OR'},
+  prodcreation:{detail:'End-to-end product creation process from design brief to manufacturing spec. Coordinates across Nike Brand, Jordan, and Converse product pipelines.',hq:'Beaverton, OR'},
+  cmo:{detail:'Nicole Graham leads global brand and consumer marketing. Responsible for rebuilding Nike\'s cultural relevance and reconnecting with core sport communities after years of lifestyle drift.',reports:'Brand Marketing, Consumer Marketing',hq:'Beaverton, OR'},
+  brandmkt:{detail:'Global campaign management, brand positioning, and seasonal storytelling. Activated the "Win Now" brand narrative across key sports moments.',hq:'Beaverton, OR'},
+  sportsmkt:{detail:'Ann Miller leads elite athlete partnerships and federation/league deals. Manages NBA, NFL, FIFA, and individual athlete franchise portfolios (LeBron, Giannis, Cristiano Ronaldo).',hq:'Beaverton, OR'},
+  comms:{detail:'Michael Gonda oversees PR, media relations, executive communications, and employee messaging. Also manages Social & Community Impact via dotted line to CLO.',hq:'Beaverton, OR'},
+  cpo:{detail:'Treasure Heinle leads people strategy during Nike\'s restructuring. Managing significant org changes including Dec 2025 leadership overhaul and ongoing senior departures.',reports:'Talent Acquisition, Total Rewards, HR Ops',hq:'Beaverton, OR'},
+  talent:{detail:'Global recruiting, leadership development, and learning & development programs. Scaling new capabilities as Nike pivots back to product-first culture.',hq:'Beaverton, OR'},
+  rewards:{detail:'Global compensation, benefits, equity programs, and people analytics. Managing pay equity and retention during a period of elevated turnover.',hq:'Beaverton, OR'},
+  clo:{detail:'Rob Leinwand oversees legal, compliance, government affairs, and social/community impact. IP protection is critical given Nike\'s innovation portfolio.',reports:'Legal & Compliance, Gov Affairs, Community Impact',hq:'Beaverton, OR'},
+  legal:{detail:'IP protection (patents, trademarks, design rights), commercial contracts, trade compliance, and litigation. Critical for protecting Nike\'s innovation pipeline.',hq:'Beaverton, OR'},
+  gov:{detail:'Government relations, lobbying, and public policy. Active on trade and tariff issues given Nike\'s global supply chain exposure.',hq:'Beaverton, OR'},
+  brands:{detail:'Three brand presidents each lead full P&Ls: Nike Brand (Amy Montagne), Jordan Brand (Sarah Mensah), Converse (Aaron Cain). Each has distinct product, marketing, and commercial teams.',hq:'Beaverton, OR'},
+  nikebrand:{detail:'Amy Montagne leads the flagship Nike brand across all sport categories. Running is the current growth engine (+20% for two consecutive quarters). Sport Offense is the strategic anchor.',reports:'Running, Basketball, Football, Training, Sportswear',hq:'Beaverton, OR'},
+  running:{detail:'Strongest performing category. Pegasus, Vomero, and Vaporfly franchises anchor the line. Project Amplify targets mass-market performance. Sustained 20%+ growth.',hq:'Beaverton, OR'},
+  bball:{detail:'LeBron, KD, and Kobe signature franchises. Jordan Brand also competes here. Rebuilding performance credibility after years of lifestyle/retro dominance.',hq:'Beaverton, OR'},
+  football:{detail:'Global football (soccer) is a key 2026 World Cup opportunity. Mercurial and Phantom performance lines. Massive national team kit portfolio across 190 countries.',hq:'Beaverton, OR'},
+  jordan:{detail:'Sarah Mensah leads Jordan Brand. Strategy is shifting back toward basketball performance and away from lifestyle oversaturation. 3 leads identified from this team.',reports:'3 identified leads',hq:'Beaverton, OR / New York, NY'},
+  ajperf:{detail:'Current NBA performance line — AJ38/39. Active athletes include Ja Morant and Luka Doncic. Rebuilding relevance with next-gen NBA stars.',hq:'Beaverton, OR'},
+  ajretro:{detail:'Heritage Jordan retro business remains a massive revenue driver. Tight supply management and OG colorway strategy balance exclusivity with accessibility.',hq:'Beaverton, OR'},
+  converse:{detail:'Aaron Cain took over as President & CEO in 2025 — new leadership standing up digital governance from scratch. Boston HQ. Chuck Taylor remains a top-10 global footwear brand.',reports:'Product & Design, Converse Commercial',hq:'Boston, MA'},
+  chuck:{detail:'Chuck Taylor All Star is one of the best-selling shoes in history. Platform variants and collaborations drive premium positioning while core low-top anchors volume.',hq:'Boston, MA'},
+  convcomm:{detail:'DTC via Converse.com and flagship stores, plus wholesale globally. Converse is rebuilding its retail presence after years of DTC-first strategy pullback.',hq:'Boston, MA'},
+  geos:{detail:'Four geography GMs were elevated to the Senior Leadership Team in Dec 2025, reporting directly to CEO. Signal of Hill\'s intent to reconnect leadership with market-level execution.',hq:'Beaverton, OR'},
+  na:{detail:'Tom Peddie leads North America — Nike\'s largest market at ~40% of revenue. NA is the recovery leader with +9% revenue growth. DTC and wholesale rebalancing underway.',hq:'Beaverton, OR'},
+  emea:{detail:'Cesar Garcia appointed Feb 2026, replacing Carl Grebert. EMEA just activated Sport Offense strategy. Strong football and running categories.',hq:'Amsterdam, Netherlands'},
+  china:{detail:'Cathy Sparks appointed Mar 2026, replacing Angela Dong (2nd China GM change under Hill). Greater China described as being on "the longest reset road." Key recovery market.',hq:'Shanghai, China'},
+  apla:{detail:'Cristin Campbell serving as Interim VP & GM. Asia Pacific & Latin America is a high-growth developing market region. Permanent appointment expected.',hq:'Beaverton, OR'},
+};
+
+const ORG=[{id:'ceo',nm:'Elliott Hill',rl:'President & CEO',color:'c-ceo',badge:'CEO · Oct 2024',children:[
+  {id:'board',nm:'M. Parker & P. Knight',rl:'Executive Chairman · Chairman Emeritus',color:'c-ceo',badge:'Board',children:[]},
+  {id:'coo',nm:'Venky Alagirisamy',rl:'EVP, Chief Operating Officer',color:'c-ops',badge:'COO',children:[
+    {id:'sc',nm:'Supply Chain & Planning',rl:'Global ops, manufacturing, logistics',color:'c-ops',badge:'Supply Chain',children:[]},
+    {id:'tech',nm:'Technology',rl:'Enterprise tech, digital products, infra',color:'c-ops',badge:'Technology',children:[
+      {id:'portfolio',nm:'Enterprise Portfolio & Transformation',rl:'Digital transformation, portfolio PMO',color:'c-ops',badge:'Portfolio',children:[]}
     ]},
-    {id:'cfo',nm:'Matt Friend',rl:'EVP, Chief Financial Officer',color:'c-fin',badge:'CFO',children:[
-      {id:'cso',nm:'Jennifer Hartley',rl:'Chief Strategy Officer',color:'c-fin',badge:'Strategy',children:[]},
-      {id:'direct',nm:'Nike Direct',rl:'DTC digital + retail stores',color:'c-fin',badge:'DTC',children:[]},
-      {id:'sales',nm:'Global Sales',rl:'Wholesale & marketplace',color:'c-fin',badge:'Commercial',children:[]},
-      {id:'growth',nm:'Dr. Thomas Clarke',rl:'Chief Growth Initiatives Officer',color:'c-fin',badge:'Growth',children:[]},
+    {id:'sustain',nm:'Cimarron Nix',rl:'Chief Sustainability Officer',color:'c-ops',badge:'Sustainability',children:[]},
+  ]},
+  {id:'cfo',nm:'Matt Friend',rl:'EVP, Chief Financial Officer',color:'c-fin',badge:'CFO',children:[
+    {id:'cso',nm:'Jennifer Hartley',rl:'Chief Strategy Officer',color:'c-fin',badge:'Strategy',children:[]},
+    {id:'direct',nm:'Nike Direct',rl:'DTC digital + retail stores',color:'c-fin',badge:'DTC',children:[]},
+    {id:'sales',nm:'Global Sales',rl:'Wholesale & marketplace',color:'c-fin',badge:'Commercial',children:[]},
+    {id:'growth',nm:'Dr. Thomas Clarke',rl:'Chief Growth Initiatives Officer',color:'c-fin',badge:'Growth',children:[]},
+  ]},
+  {id:'cidp',nm:'Phil McCartney',rl:'EVP, Chief Innovation, Design & Product',color:'c-idp',badge:'CIDP',children:[
+    {id:'cio',nm:'Andy Caine',rl:'Chief Innovation Officer (Apr 2026)',color:'c-idp',badge:'CIO',children:[
+      {id:'perf',nm:'Performance Innovation',rl:'Air, React, Flyknit; athlete tech',color:'c-idp',badge:'Perf Innov',children:[]},
+      {id:'nsrl',nm:'Nike Sports Research Lab',rl:'Advanced research & athlete science',color:'c-idp',badge:'NSRL',children:[]},
     ]},
-    {id:'cidp',nm:'Phil McCartney',rl:'EVP, Chief Innovation, Design & Product',color:'c-idp',badge:'CIDP',children:[
-      {id:'cio',nm:'Andy Caine',rl:'Chief Innovation Officer (Apr 2026)',color:'c-idp',badge:'CIO',children:[
-        {id:'perf',nm:'Performance Innovation',rl:'Air, React, Flyknit; athlete tech',color:'c-idp',badge:'Perf Innov',children:[]},
-        {id:'nsrl',nm:'Nike Sports Research Lab',rl:'Advanced research & athlete science',color:'c-idp',badge:'NSRL',children:[]},
-      ]},
-      {id:'design',nm:'Global Design',rl:'Footwear, apparel & equipment design',color:'c-idp',badge:'Design',children:[]},
-      {id:'prodcreation',nm:'Product Creation',rl:'End-to-end: Nike, Jordan, Converse',color:'c-idp',badge:'Product',children:[]},
+    {id:'design',nm:'Global Design',rl:'Footwear, apparel & equipment design',color:'c-idp',badge:'Design',children:[]},
+    {id:'prodcreation',nm:'Product Creation',rl:'End-to-end: Nike, Jordan, Converse',color:'c-idp',badge:'Product',children:[]},
+  ]},
+  {id:'cmo',nm:'Nicole Graham',rl:'EVP, Chief Marketing Officer',color:'c-mkt',badge:'CMO',children:[
+    {id:'brandmkt',nm:'Brand Marketing',rl:'Global campaigns, brand identity',color:'c-mkt',badge:'Brand Mkt',children:[]},
+    {id:'sportsmkt',nm:'Ann Miller',rl:'EVP, Global Sports Marketing',color:'c-mkt',badge:'Sports Mkt',children:[]},
+    {id:'comms',nm:'Michael Gonda',rl:'EVP, Chief Communications Officer',color:'c-mkt',badge:'Comms',children:[]},
+  ]},
+  {id:'cpo',nm:'Treasure Heinle',rl:'EVP, Chief People Officer',color:'c-ppl',badge:'CPO',children:[
+    {id:'talent',nm:'Talent & Development',rl:'Recruiting, L&D',color:'c-ppl',badge:'Talent',children:[]},
+    {id:'rewards',nm:'Total Rewards',rl:'Comp, benefits, people analytics',color:'c-ppl',badge:'HR Ops',children:[]},
+  ]},
+  {id:'clo',nm:'Rob Leinwand',rl:'EVP, Chief Legal Officer',color:'c-ppl',badge:'CLO',children:[
+    {id:'legal',nm:'Legal & Compliance',rl:'IP, litigation, regulatory',color:'c-ppl',badge:'Legal',children:[]},
+    {id:'gov',nm:'Govt & Public Affairs',rl:'Lobbying, policy, trade',color:'c-ppl',badge:'Gov Affairs',children:[]},
+  ]},
+  {id:'brands',nm:'Brand Presidents',rl:'Nike · Jordan · Converse',color:'c-brand',badge:'Brands',children:[
+    {id:'nikebrand',nm:'Amy Montagne',rl:'President, Nike Brand',color:'c-brand',badge:'Nike Brand',children:[
+      {id:'running',nm:'Running',rl:'Pegasus, Vaporfly, Project Amplify',color:'c-brand',badge:'Running',children:[]},
+      {id:'bball',nm:'Basketball',rl:'LeBron, KD, Kobe',color:'c-brand',badge:'Basketball',children:[]},
+      {id:'football',nm:'Football (Soccer)',rl:'Mercurial, Phantom, kits',color:'c-brand',badge:'Football',children:[]},
     ]},
-    {id:'cmo',nm:'Nicole Graham',rl:'EVP, Chief Marketing Officer',color:'c-mkt',badge:'CMO',children:[
-      {id:'brandmkt',nm:'Brand Marketing',rl:'Global campaigns, brand identity',color:'c-mkt',badge:'Brand Mkt',children:[]},
-      {id:'sportsmkt',nm:'Ann Miller',rl:'EVP, Global Sports Marketing',color:'c-mkt',badge:'Sports Mkt',children:[]},
-      {id:'comms',nm:'Michael Gonda',rl:'EVP, Chief Communications Officer',color:'c-mkt',badge:'Comms',children:[]},
+    {id:'jordan',nm:'Sarah Mensah',rl:'President, Jordan Brand',color:'c-brand',badge:'Jordan Brand',children:[
+      {id:'ajperf',nm:'Jordan Performance',rl:'AJ 38/39, NBA athletes',color:'c-brand',badge:'Performance',children:[]},
+      {id:'ajretro',nm:'Jordan Heritage & Retro',rl:'Retro 1-14, OG colorways',color:'c-brand',badge:'Retro',children:[]},
     ]},
-    {id:'cpo',nm:'Treasure Heinle',rl:'EVP, Chief People Officer',color:'c-ppl',badge:'CPO',children:[
-      {id:'talent',nm:'Talent & Development',rl:'Recruiting, L&D',color:'c-ppl',badge:'Talent',children:[]},
-      {id:'rewards',nm:'Total Rewards',rl:'Comp, benefits, people analytics',color:'c-ppl',badge:'HR Ops',children:[]},
+    {id:'converse',nm:'Aaron Cain',rl:'President & CEO, Converse',color:'c-brand',badge:'Converse',children:[
+      {id:'chuck',nm:'Chuck Taylor',rl:'All Star, 70s, platform',color:'c-brand',badge:'Chuck Taylor',children:[]},
+      {id:'convcomm',nm:'Converse Commercial',rl:'DTC + wholesale globally',color:'c-brand',badge:'Commercial',children:[]},
     ]},
-    {id:'clo',nm:'Rob Leinwand',rl:'EVP, Chief Legal Officer',color:'c-ppl',badge:'CLO',children:[
-      {id:'legal',nm:'Legal & Compliance',rl:'IP, litigation, regulatory',color:'c-ppl',badge:'Legal',children:[]},
-      {id:'gov',nm:'Govt & Public Affairs',rl:'Lobbying, policy, trade',color:'c-ppl',badge:'Gov Affairs',children:[]},
-    ]},
-    {id:'brands',nm:'Brand Presidents',rl:'Nike · Jordan · Converse',color:'c-brand',badge:'Brands',children:[
-      {id:'nikebrand',nm:'Amy Montagne',rl:'President, Nike Brand',color:'c-brand',badge:'Nike Brand',children:[
-        {id:'running',nm:'Running',rl:'Pegasus, Vaporfly, Project Amplify',color:'c-brand',badge:'Running',children:[]},
-        {id:'bball',nm:'Basketball',rl:'LeBron, KD, Kobe',color:'c-brand',badge:'Basketball',children:[]},
-        {id:'football',nm:'Football (Soccer)',rl:'Mercurial, Phantom, kits',color:'c-brand',badge:'Football',children:[]},
-      ]},
-      {id:'jordan',nm:'Sarah Mensah',rl:'President, Jordan Brand',color:'c-brand',badge:'Jordan Brand',children:[
-        {id:'ajperf',nm:'Jordan Performance',rl:'AJ 38/39, NBA athletes',color:'c-brand',badge:'Performance',children:[]},
-        {id:'ajretro',nm:'Jordan Heritage & Retro',rl:'Retro 1–14, OG colorways',color:'c-brand',badge:'Retro',children:[]},
-      ]},
-      {id:'converse',nm:'Aaron Cain',rl:'President & CEO, Converse',color:'c-brand',badge:'Converse',children:[
-        {id:'chuck',nm:'Chuck Taylor',rl:'All Star, 70s, platform',color:'c-brand',badge:'Chuck Taylor',children:[]},
-        {id:'convcomm',nm:'Converse Commercial',rl:'DTC + wholesale globally',color:'c-brand',badge:'Commercial',children:[]},
-      ]},
-    ]},
-    {id:'geos',nm:'Geography Leaders',rl:'CEO-direct · elevated Dec 2025',color:'c-geo',badge:'Geographies',children:[
-      {id:'na',nm:'Tom Peddie',rl:'VP & GM, North America',color:'c-geo',badge:'N. America',children:[]},
-      {id:'emea',nm:'César García',rl:'VP & GM, EMEA (Feb 2026)',color:'c-geo',badge:'EMEA',children:[]},
-      {id:'china',nm:'Cathy Sparks',rl:'VP & GM, Greater China (Mar 2026)',color:'c-geo',badge:'Greater China',children:[]},
-      {id:'apla',nm:'Cristin Campbell',rl:'Interim VP & GM, APLA',color:'c-geo',badge:'APLA',children:[]},
-    ]},
-  ]}
-];
+  ]},
+  {id:'geos',nm:'Geography Leaders',rl:'CEO-direct · elevated Dec 2025',color:'c-geo',badge:'Geographies',children:[
+    {id:'na',nm:'Tom Peddie',rl:'VP & GM, North America',color:'c-geo',badge:'N. America',children:[]},
+    {id:'emea',nm:'Cesar Garcia',rl:'VP & GM, EMEA (Feb 2026)',color:'c-geo',badge:'EMEA',children:[]},
+    {id:'china',nm:'Cathy Sparks',rl:'VP & GM, Greater China (Mar 2026)',color:'c-geo',badge:'Greater China',children:[]},
+    {id:'apla',nm:'Cristin Campbell',rl:'Interim VP & GM, APLA',color:'c-geo',badge:'APLA',children:[]},
+  ]},
+]}];
+
+const AVATAR_COLORS={
+  'c-ceo':['#EEEDFE','#534AB7'],
+  'c-ops':['#E1F5EE','#0F6E56'],
+  'c-fin':['#E6F1FB','#185FA5'],
+  'c-idp':['#FAEEDA','#854F0B'],
+  'c-mkt':['#FAECE7','#993C1D'],
+  'c-ppl':['#FBEAF0','#993556'],
+  'c-geo':['#EAF3DE','#3B6D11'],
+  'c-brand':['#F3EFFE','#7c3aed'],
+};
 
 let filter='all';
 const open=new Set();
@@ -282,12 +368,26 @@ function leadsFor(nodeId){
 
 function dotCls(s){return s==='vp'?'dvp':s==='dir'?'ddir':'dmgr';}
 
+function initials(nm){
+  return nm.split(/[\s&·]+/).filter(Boolean).slice(0,2).map(w=>w[0]?w[0].toUpperCase():'').join('');
+}
+
 function nodeEl(n){
   const leads=leadsFor(n.id);
   const isOpen=open.has(n.id);
   const hasL=leads.length>0;
-  return `<div class="node ${n.color}${hasL?' clickable':''}${isOpen?' open':''}" ${hasL?`onclick="toggle('${n.id}')"`:''}>
-    ${hasL?`<span class="expand-icon">${isOpen?'×':'+'}</span>`:''}
+  const meta=NODE_META[n.id]||{};
+  const tooltipData=JSON.stringify({
+    id:n.id,nm:n.nm,rl:n.rl,badge:n.badge,
+    detail:meta.detail||'',reports:meta.reports||'',hq:meta.hq||'',
+    color:n.color,leadCount:leads.length
+  }).replace(/"/g,'&quot;');
+  return `<div class="node ${n.color}${hasL?' clickable':''}${isOpen?' open':''}"
+    ${hasL?`onclick="toggle('${n.id}')"`:''} 
+    data-tip="${tooltipData}"
+    onmouseenter="showTip(event,this)"
+    onmouseleave="hideTip()">
+    ${hasL?`<span class="expand-icon">${isOpen?'x':'+'}</span>`:''}
     <div class="nm">${n.nm}</div>
     <div class="rl">${n.rl}</div>
     <span class="nbadge">${n.badge}</span>
@@ -308,7 +408,7 @@ function nodeEl(n){
 
 function buildBranch(node){
   const children=node.children||[];
-  const vlineH=children.length?`<div class="vline"></div>`:'';
+  const vlineH=children.length?'<div class="vline"></div>':'';
   const childSection=children.length?`
     <div style="position:relative;display:flex;gap:var(--gap);justify-content:center;align-items:flex-start">
       ${children.length>1?`<div style="position:absolute;top:0;left:calc(var(--node-w)/2 + var(--gap)/2);right:calc(var(--node-w)/2 + var(--gap)/2);height:1px;background:var(--line)"></div>`:''}
@@ -328,6 +428,57 @@ function toggle(id){
   open.has(id)?open.delete(id):open.add(id);
   render();
 }
+
+const tip=document.getElementById('tooltip');
+let tipTimeout;
+
+function showTip(e,el){
+  clearTimeout(tipTimeout);
+  const raw=el.dataset.tip;
+  if(!raw) return;
+  let d;
+  try{d=JSON.parse(raw.replace(/&quot;/g,'"'));}catch(ex){return;}
+  const [abg,afg]=AVATAR_COLORS[d.color]||['#f1efe8','#888'];
+  const leads=leadsFor(d.id).slice(0,4);
+  const totalLeads=leadsFor(d.id).length;
+  tip.innerHTML=`
+    <div class="tt-header">
+      <div class="tt-avatar" style="background:${abg};color:${afg}">${initials(d.nm)}</div>
+      <div><div class="tt-name">${d.nm}</div><div class="tt-role">${d.rl}</div></div>
+    </div>
+    <span class="tt-badge nbadge ${d.color}">${d.badge}</span>
+    ${d.detail?`<div class="tt-divider"></div>
+    <div class="tt-row"><div class="tt-value" style="font-size:11px;line-height:1.5;color:var(--ts)">${d.detail}</div></div>`:''}
+    ${d.reports?`<div class="tt-row" style="margin-top:6px"><div class="tt-label">Reports</div><div class="tt-value">${d.reports}</div></div>`:''}
+    ${d.hq?`<div class="tt-row"><div class="tt-label">Location</div><div class="tt-value">${d.hq}</div></div>`:''}
+    ${totalLeads>0?`<div class="tt-leads-hdr">${totalLeads} lead${totalLeads>1?'s':''} in your list</div>
+    ${leads.map(l=>`<div class="tt-lead-row">
+      <div class="lrow-dot ${dotCls(l.s)}" style="margin-top:3px;flex-shrink:0"></div>
+      <div><div class="tt-lead-name">${l.name}</div><div class="tt-lead-title">${l.title}</div></div>
+    </div>`).join('')}
+    ${totalLeads>4?`<div style="font-size:10px;color:var(--tt);margin-top:4px">+${totalLeads-4} more - click to expand</div>`:''}`:''}`;
+  positionTip(e);
+  tip.classList.add('visible');
+}
+
+function positionTip(e){
+  const tw=270,th=tip.offsetHeight||300;
+  const vw=window.innerWidth,vh=window.innerHeight;
+  let x=e.clientX+16,y=e.clientY-20;
+  if(x+tw>vw-8) x=e.clientX-tw-16;
+  if(y+th>vh-8) y=vh-th-8;
+  if(y<8) y=8;
+  tip.style.left=x+'px';
+  tip.style.top=y+'px';
+}
+
+function hideTip(){
+  tipTimeout=setTimeout(()=>tip.classList.remove('visible'),120);
+}
+
+document.addEventListener('mousemove',e=>{
+  if(tip.classList.contains('visible')&&e.target.closest('[data-tip]')) positionTip(e);
+});
 
 function render(){
   document.getElementById('tree').innerHTML=ORG.map(n=>buildBranch(n)).join('');
